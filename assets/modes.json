@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "modes": [
+    {
+      "id": "calm",
+      "name": "平稳",
+      "outputType": "changeRate",
+      "formula": "random(-0.001, 0.001)",
+      "variables": []
+    },
+    {
+      "id": "sine",
+      "name": "周期波动示例",
+      "outputType": "changeRate",
+      "formula": "sin(phase) * 0.003 + random(-0.0005, 0.0005)",
+      "variables": [
+        {
+          "name": "phase",
+          "initial": {
+            "distribution": "uniform",
+            "min": 0,
+            "max": 6.283185307179586
+          },
+          "update": "phase + 0.1308996938995747"
+        }
+      ]
+    },
+    {
+      "id": "volatile",
+      "name": "高波动",
+      "outputType": "changeRate",
+      "formula": "random(-0.012, 0.012)",
+      "variables": []
+    },
+    {
+      "id": "absolute_demo",
+      "name": "绝对价格示例",
+      "outputType": "absolutePrice",
+      "formula": "startPrice + sin(t / 8) * 3 + (prevPrice - startPrice) * 0.2",
+      "variables": []
+    }
+  ]
+}
+
