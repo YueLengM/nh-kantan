@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "normal": { "model": "nhkantan:market_display" },
+    "inventory": { "model": "nhkantan:market_display" }
+  }
+}

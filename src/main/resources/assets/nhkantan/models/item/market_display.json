@@ -1,0 +1,6 @@
+{
+  "parent": "builtin/generated",
+  "textures": {
+    "particle": "nhkantan:blocks/market_display"
+  }
+}
