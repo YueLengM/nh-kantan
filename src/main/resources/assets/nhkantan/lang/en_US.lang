@@ -1,2 +1,11 @@
 # NH kantan language file - English
 tile.nhkantan.market_display.name=Market Display
+
+gui.nhkantan.market_display.title=Market Terminal
+gui.nhkantan.market_display.placeholder=Market features coming soon...
+gui.nhkantan.market_display.width=Screen Width: %s
+gui.nhkantan.market_display.height=Screen Height: %s
+gui.nhkantan.market_display.depth=Screen Depth (px)
+
+screen.nhkantan.market_display.title=NH Kantan
+screen.nhkantan.market_display.placeholder=Market Screen

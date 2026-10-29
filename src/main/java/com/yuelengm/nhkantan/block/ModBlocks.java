@@ -3,6 +3,9 @@ package com.yuelengm.nhkantan.block;
 import net.minecraft.block.Block;
 import net.minecraft.item.ItemBlock;
 
+import com.gtnewhorizon.gtnhlib.blockstate.registry.BlockPropertyRegistry;
+import com.yuelengm.nhkantan.NHKantan;
+
 import cpw.mods.fml.common.registry.GameRegistry;
 
 /**
@@ -18,6 +21,9 @@ public class ModBlocks {
 
     public static void register() {
         registerBlock(marketDisplay, "market_display");
+        BlockPropertyRegistry.registerProperty(marketDisplay, MarketDisplayOrientation.PROPERTY);
+
+        GameRegistry.registerTileEntity(TileMarketDisplay.class, NHKantan.MODID + ":market_display");
     }
 
     private static void registerBlock(Block block, String name) {

@@ -10,7 +10,12 @@ import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 
-@Mod(modid = NHKantan.MODID, version = Tags.VERSION, name = "NH kantan", acceptedMinecraftVersions = "[1.7.10]")
+@Mod(
+    modid = NHKantan.MODID,
+    version = Tags.VERSION,
+    name = "NH kantan",
+    acceptedMinecraftVersions = "[1.7.10]",
+    dependencies = "required-after:gtnhlib;required-after:modularui2")
 public class NHKantan {
 
     public static final String MODID = "nhkantan";
