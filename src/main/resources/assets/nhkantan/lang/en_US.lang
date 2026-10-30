@@ -9,3 +9,7 @@ gui.nhkantan.market_display.depth=Screen Depth (px)
 
 screen.nhkantan.market_display.title=NH Kantan
 screen.nhkantan.market_display.placeholder=Market Screen
+
+item.nhkantan.market_terminal.name=Market Terminal
+gui.nhkantan.market_terminal.title=Market Terminal
+gui.nhkantan.market_terminal.placeholder=Trading features coming soon...

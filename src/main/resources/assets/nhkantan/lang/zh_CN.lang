@@ -9,3 +9,7 @@ gui.nhkantan.market_display.depth=屏幕深度（像素）
 
 screen.nhkantan.market_display.title=NH Kantan
 screen.nhkantan.market_display.placeholder=股市大屏
+
+item.nhkantan.market_terminal.name=股市终端
+gui.nhkantan.market_terminal.title=股市终端
+gui.nhkantan.market_terminal.placeholder=交易功能开发中……
