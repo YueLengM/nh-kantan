@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "stocks": [
+    {
+      "id": "gtnh_index",
+      "name": "GTNH 综合经济指数",
+      "enabled": true,
+      "initialPrice": 100,
+      "lowerBound": 10,
+      "upperBound": 500,
+      "modes": [
+        {
+          "modeId": "calm",
+          "weight": 5,
+          "switchProbability": 0.04
+        },
+        {
+          "modeId": "sine",
+          "weight": 3,
+          "switchProbability": 0.025
+        },
+        {
+          "modeId": "volatile",
+          "weight": 1,
+          "switchProbability": 0.1
+        },
+        {
+          "modeId": "absolute_demo",
+          "weight": 0,
+          "switchProbability": 0.05
+        }
+      ]
+    }
+  ]
+}

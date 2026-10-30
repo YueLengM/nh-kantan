@@ -13,3 +13,5 @@ screen.nhkantan.market_display.placeholder=股市大屏
 item.nhkantan.market_terminal.name=股市终端
 gui.nhkantan.market_terminal.title=股市终端
 gui.nhkantan.market_terminal.placeholder=交易功能开发中……
+screen.nhkantan.market_display.no_data=暂无行情数据
+gui.nhkantan.market_terminal.no_data=暂无行情数据

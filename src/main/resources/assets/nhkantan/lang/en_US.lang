@@ -13,3 +13,5 @@ screen.nhkantan.market_display.placeholder=Market Screen
 item.nhkantan.market_terminal.name=Market Terminal
 gui.nhkantan.market_terminal.title=Market Terminal
 gui.nhkantan.market_terminal.placeholder=Trading features coming soon...
+screen.nhkantan.market_display.no_data=No market data
+gui.nhkantan.market_terminal.no_data=No market data
