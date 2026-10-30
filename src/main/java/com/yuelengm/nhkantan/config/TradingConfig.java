@@ -8,6 +8,7 @@ import com.yuelengm.nhkantan.NHKantan;
     category = "trading",
     configSubDirectory = ConfigPaths.DIRECTORY_NAME,
     filename = ConfigPaths.CONFIG_FILE_NAME)
+@Config.LangKeyPattern
 @Config.Comment("Margin trading rules. Values here are defaults for every stock; see instrumentOverrides.")
 public class TradingConfig {
 

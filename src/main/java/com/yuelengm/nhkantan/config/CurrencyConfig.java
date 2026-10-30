@@ -8,6 +8,7 @@ import com.yuelengm.nhkantan.NHKantan;
     category = "currency",
     configSubDirectory = ConfigPaths.DIRECTORY_NAME,
     filename = ConfigPaths.CONFIG_FILE_NAME)
+@Config.LangKeyPattern
 @Config.Comment("Market account currency.")
 public class CurrencyConfig {
 

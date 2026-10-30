@@ -8,6 +8,7 @@ import com.yuelengm.nhkantan.NHKantan;
     category = "market",
     configSubDirectory = ConfigPaths.DIRECTORY_NAME,
     filename = ConfigPaths.CONFIG_FILE_NAME)
+@Config.LangKeyPattern
 @Config.Comment("Price engine settings. Stocks and modes are defined in stocks.json and modes.json.")
 public class MarketConfig {
 

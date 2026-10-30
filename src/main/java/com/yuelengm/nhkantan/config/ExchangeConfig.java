@@ -8,6 +8,7 @@ import com.yuelengm.nhkantan.NHKantan;
     category = "exchange",
     configSubDirectory = ConfigPaths.DIRECTORY_NAME,
     filename = ConfigPaths.CONFIG_FILE_NAME)
+@Config.LangKeyPattern
 @Config.Comment("Exchange between market currency and items, and items accepted to repay debt.")
 public class ExchangeConfig {
 
