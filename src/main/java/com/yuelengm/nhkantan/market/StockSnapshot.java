@@ -1,8 +1,8 @@
 package com.yuelengm.nhkantan.market;
 
 /**
- * Public view of a stock sent to clients: display data and recent prices only. Mode, formulas and random state are
- * never part of a snapshot.
+ * Public view of a stock sent to clients: display data, current price and the visible candles only. Older candles,
+ * mode, formulas and random state never leave the server.
  */
 public class StockSnapshot {
 
@@ -10,21 +10,19 @@ public class StockSnapshot {
     private final String name;
     private final double lowerBound;
     private final double upperBound;
-    private final long sequence;
-    private final double[] history;
+    private final double price;
+    private final Candle[] candles;
 
     /**
-     * @param sequence update counter of the newest price in {@code history}
-     * @param history  recent prices, oldest first; never empty
+     * @param candles visible candles, oldest first; may be empty for a stock that has not been updated yet
      */
-    public StockSnapshot(String id, String name, double lowerBound, double upperBound, long sequence,
-        double[] history) {
+    public StockSnapshot(String id, String name, double lowerBound, double upperBound, double price, Candle[] candles) {
         this.id = id;
         this.name = name;
         this.lowerBound = lowerBound;
         this.upperBound = upperBound;
-        this.sequence = sequence;
-        this.history = history;
+        this.price = price;
+        this.candles = candles;
     }
 
     public String id() {
@@ -43,11 +41,11 @@ public class StockSnapshot {
         return upperBound;
     }
 
-    public long sequence() {
-        return sequence;
+    public double price() {
+        return price;
     }
 
-    public double[] history() {
-        return history;
+    public Candle[] candles() {
+        return candles;
     }
 }

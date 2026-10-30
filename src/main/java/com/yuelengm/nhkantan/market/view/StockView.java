@@ -1,10 +1,14 @@
 package com.yuelengm.nhkantan.market.view;
 
-import com.yuelengm.nhkantan.market.PriceHistory;
+import java.util.Arrays;
+
+import com.yuelengm.nhkantan.market.Candle;
+import com.yuelengm.nhkantan.market.CandleWindow;
 import com.yuelengm.nhkantan.market.StockSnapshot;
 
 /**
- * Client copy of a stock's public data, updated by snapshots and price ticks.
+ * Client copy of a stock's public data: current price and the visible candles only. Candles that scroll out of the
+ * window are dropped; the client never keeps older history.
  */
 public class StockView {
 
@@ -12,17 +16,17 @@ public class StockView {
     private final String name;
     private final double lowerBound;
     private final double upperBound;
-    private final PriceHistory history;
-    private long sequence;
+    private final CandleWindow candles;
+    private double price;
 
-    public StockView(StockSnapshot snapshot, int historyCapacity) {
+    public StockView(StockSnapshot snapshot, int visibleCandles) {
         this.id = snapshot.id();
         this.name = snapshot.name();
         this.lowerBound = snapshot.lowerBound();
         this.upperBound = snapshot.upperBound();
-        this.history = new PriceHistory(historyCapacity);
-        this.history.setAll(snapshot.history());
-        this.sequence = snapshot.sequence();
+        this.candles = new CandleWindow(visibleCandles);
+        this.candles.upsertAll(Arrays.asList(snapshot.candles()));
+        this.price = snapshot.price();
     }
 
     public String id() {
@@ -41,28 +45,25 @@ public class StockView {
         return upperBound;
     }
 
-    /** Recent prices, oldest first. Read only; never empty. */
-    public PriceHistory history() {
-        return history;
-    }
-
-    public long sequence() {
-        return sequence;
+    /** Visible candles, oldest first; the newest may still be forming. Read only. */
+    public CandleWindow candles() {
+        return candles;
     }
 
     public double price() {
-        return history.latest();
+        return price;
     }
 
-    /** Relative change over the visible history, e.g. {@code 0.05} for +5%. */
-    public double historyChange() {
-        return history.latest() / history.oldest() - 1.0D;
+    /** Relative change since the open of the oldest visible candle, e.g. {@code 0.05} for +5%. */
+    public double windowChange() {
+        Candle oldest = candles.oldest();
+        return oldest == null ? 0.0D : price / oldest.open() - 1.0D;
     }
 
-    /** Appends a newer price; stale or duplicate ticks are ignored. */
-    public void applyTick(long tickSequence, double price) {
-        if (tickSequence <= sequence) return;
-        sequence = tickSequence;
-        history.add(price);
+    public void applyCandle(Candle candle) {
+        Candle latest = candles.latest();
+        if (latest != null && candle.index() < latest.index()) return;
+        candles.upsert(candle);
+        price = candle.close();
     }
 }

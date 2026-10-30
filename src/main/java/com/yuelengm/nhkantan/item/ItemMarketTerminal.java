@@ -1,8 +1,5 @@
 package com.yuelengm.nhkantan.item;
 
-import java.util.Collection;
-import java.util.Collections;
-
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
@@ -11,27 +8,41 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
 import com.cleanroommc.modularui.api.IGuiHolder;
+import com.cleanroommc.modularui.api.drawable.IIcon;
 import com.cleanroommc.modularui.api.drawable.IKey;
+import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.factory.GuiFactories;
 import com.cleanroommc.modularui.factory.PlayerInventoryGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.ModularScreen;
 import com.cleanroommc.modularui.screen.UISettings;
+import com.cleanroommc.modularui.value.BoolValue;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.widgets.ButtonWidget;
+import com.cleanroommc.modularui.widgets.ListWidget;
+import com.cleanroommc.modularui.widgets.ToggleButton;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.yuelengm.nhkantan.NHKantan;
 import com.yuelengm.nhkantan.market.view.ClientMarketData;
+import com.yuelengm.nhkantan.market.view.PriceFormat;
 import com.yuelengm.nhkantan.market.view.StockView;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * Handheld market terminal. Right-clicking opens the market GUI, which currently lists live stock prices from the
- * shared client market data; trading is not implemented yet.
+ * Handheld market terminal. Right-clicking opens the market GUI: a stock list and the K-line chart of the selected
+ * stock, both fed by the shared client market data. Trading is not implemented yet.
  */
 public class ItemMarketTerminal extends Item implements IGuiHolder<PlayerInventoryGuiData> {
+
+    private static final int PANEL_WIDTH = 330;
+    private static final int PANEL_HEIGHT = 190;
+    private static final int PADDING = 7;
+    private static final int GAP = 4;
+    private static final int TITLE_HEIGHT = 10;
+    private static final int LIST_WIDTH = 92;
+    private static final int BUTTON_HEIGHT = 22;
 
     public ItemMarketTerminal() {
         this.setUnlocalizedName("nhkantan.market_terminal");
@@ -57,55 +68,72 @@ public class ItemMarketTerminal extends Item implements IGuiHolder<PlayerInvento
 
     @Override
     public ModularPanel buildUI(PlayerInventoryGuiData data, PanelSyncManager syncManager, UISettings settings) {
+        ModularPanel panel = ModularPanel.defaultPanel("nhkantan_market_terminal", PANEL_WIDTH, PANEL_HEIGHT);
         Flow column = Flow.column()
             .widthRel(1f)
             .heightRel(1f)
-            .padding(7)
-            .childPadding(4)
+            .padding(PADDING)
+            .childPadding(GAP)
             .child(
                 IKey.lang("gui.nhkantan.market_terminal.title")
                     .asWidget()
-                    .left(0));
-
-        // Prices are client-side display data; the server-side copy of the panel carries no stock rows
-        Collection<StockView> stocks = data.getPlayer().worldObj.isRemote ? ClientMarketData.INSTANCE.stocks()
-            : Collections.emptyList();
-        if (stocks.isEmpty()) {
-            column.child(
-                IKey.lang("gui.nhkantan.market_terminal.no_data")
-                    .asWidget()
-                    .left(0));
+                    .left(0)
+                    .height(TITLE_HEIGHT));
+        // Market data only exists on the client; the server-side copy of the panel carries no market widgets
+        if (data.getPlayer().worldObj.isRemote) {
+            column.child(marketView());
         }
-        for (StockView stock : stocks) {
-            column.child(stockRow(stock.id(), stock.name()));
-        }
-
-        ModularPanel panel = ModularPanel.defaultPanel("nhkantan_market_terminal", 200, 120);
-        panel.child(column)
+        return panel.child(column)
             .child(ButtonWidget.panelCloseButton());
-        return panel;
     }
 
-    /** Name on the left, live price and change on the right; looks the stock up by id on every frame. */
-    private static Flow stockRow(String stockId, String name) {
+    /** Stock list on the left, chart of the selected stock on the right. */
+    private static Flow marketView() {
+        int contentWidth = PANEL_WIDTH - PADDING * 2;
+        int contentHeight = PANEL_HEIGHT - PADDING * 2 - TITLE_HEIGHT - GAP;
+        Selection selection = new Selection();
+        StockView first = ClientMarketData.INSTANCE.first();
+        selection.stockId = first == null ? "" : first.id();
+
+        ListWidget<IWidget, ?> list = new ListWidget<>().width(LIST_WIDTH)
+            .heightRel(1f)
+            .childSeparator(IIcon.EMPTY_2PX);
+        for (StockView stock : ClientMarketData.INSTANCE.stocks()) {
+            list.child(stockButton(stock.id(), stock.name(), selection));
+        }
         return Flow.row()
-            .widthRel(1f)
-            .height(12)
+            .width(contentWidth)
+            .height(contentHeight)
+            .childPadding(GAP)
+            .child(list)
             .child(
-                IKey.str(name)
-                    .asWidget()
-                    .widthRel(0.5f))
-            .child(
-                IKey.dynamic(() -> formatPrice(ClientMarketData.INSTANCE.get(stockId)))
-                    .asWidget()
-                    .widthRel(0.5f));
+                NHKantan.proxy.createStockChart(() -> ClientMarketData.INSTANCE.get(selection.stockId))
+                    .width(contentWidth - LIST_WIDTH - GAP)
+                    .heightRel(1f));
+    }
+
+    /** Selectable entry showing the stock name and its live price and change. */
+    private static ToggleButton stockButton(String stockId, String name, Selection selection) {
+        return new ToggleButton().widthRel(1f)
+            .height(BUTTON_HEIGHT)
+            .value(
+                new BoolValue.Dynamic(
+                    () -> stockId.equals(selection.stockId),
+                    selected -> { if (selected) selection.stockId = stockId; }))
+            .overlay(IKey.dynamic(() -> name + "\n" + formatPrice(ClientMarketData.INSTANCE.get(stockId))));
     }
 
     private static String formatPrice(StockView stock) {
         if (stock == null) return "-";
-        double change = stock.historyChange();
+        double change = stock.windowChange();
         EnumChatFormatting color = change > 0.0D ? EnumChatFormatting.DARK_GREEN
             : change < 0.0D ? EnumChatFormatting.RED : EnumChatFormatting.DARK_GRAY;
-        return String.format("%.2f %s%+.2f%%", stock.price(), color, change * 100.0D);
+        return PriceFormat.price(stock.price()) + " " + color + PriceFormat.change(change);
+    }
+
+    /** Client-side selection state of one open terminal GUI. */
+    private static class Selection {
+
+        private String stockId;
     }
 }

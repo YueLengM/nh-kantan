@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -13,6 +14,8 @@ import com.google.gson.JsonObject;
  * Parses and validates the root object of {@code stocks.json} against the already parsed modes.
  */
 public class StockDefinitionParser {
+
+    private static final Pattern STOCK_ID = Pattern.compile("[A-Za-z0-9_-]+");
 
     private StockDefinitionParser() {}
 
@@ -42,6 +45,11 @@ public class StockDefinitionParser {
     private static StockDefinition parseStock(JsonObject json, String location, Map<String, ModeDefinition> modes) {
         String id = JsonFields.requireString(json, "id", location);
         String where = "stock '" + id + "'";
+        if (!STOCK_ID.matcher(id)
+            .matches()) {
+            // The id names the stock's candle history file, so it must be file-name safe
+            throw new DefinitionException(where + " id may only contain letters, digits, '_' and '-'");
+        }
         String name = JsonFields.optionalString(json, "name", where, id);
         boolean enabled = JsonFields.optionalBoolean(json, "enabled", where, true);
         double initialPrice = JsonFields.requireNumber(json, "initialPrice", where);

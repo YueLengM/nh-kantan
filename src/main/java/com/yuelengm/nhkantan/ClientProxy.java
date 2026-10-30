@@ -1,8 +1,13 @@
 package com.yuelengm.nhkantan;
 
+import java.util.function.Supplier;
+
+import com.cleanroommc.modularui.widget.Widget;
 import com.yuelengm.nhkantan.block.TileMarketDisplay;
 import com.yuelengm.nhkantan.client.ClientMarketEventHandler;
+import com.yuelengm.nhkantan.client.gui.StockChartWidget;
 import com.yuelengm.nhkantan.client.render.MarketDisplayRenderer;
+import com.yuelengm.nhkantan.market.view.StockView;
 
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -17,5 +22,10 @@ public class ClientProxy extends CommonProxy {
         FMLCommonHandler.instance()
             .bus()
             .register(new ClientMarketEventHandler());
+    }
+
+    @Override
+    public Widget<?> createStockChart(Supplier<StockView> stock) {
+        return new StockChartWidget(stock);
     }
 }

@@ -1,18 +1,18 @@
 package com.yuelengm.nhkantan.market.engine;
 
-import java.nio.ByteBuffer;
+import javax.annotation.Nullable;
 
-import net.minecraft.nbt.NBTTagByteArray;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 
-import com.yuelengm.nhkantan.market.PriceHistory;
+import com.yuelengm.nhkantan.market.Candle;
 import com.yuelengm.nhkantan.market.random.SplitMix64Random;
 
 /**
  * Mutable runtime state of one stock. Everything needed to continue the exact same price path after a restart is
- * persisted: price, mode context, mode variables, random state and history.
+ * persisted: price, mode context, mode variables, random state and the candle still forming. Completed candles live in
+ * a {@link CandleStore}.
  */
 public class StockState {
 
@@ -29,14 +29,19 @@ public class StockState {
     private static final String NBT_VARIABLE_NAME = "Name";
     private static final String NBT_VARIABLE_VALUE = "Value";
     private static final String NBT_RANDOM = "Random";
-    private static final String NBT_HISTORY = "History";
+    private static final String NBT_NEXT_CANDLE = "NextCandle";
+    private static final String NBT_CANDLE = "Candle";
+    private static final String NBT_CANDLE_UPDATES = "CandleUpdates";
+    private static final String NBT_OPEN = "Open";
+    private static final String NBT_HIGH = "High";
+    private static final String NBT_LOW = "Low";
+    private static final String NBT_CLOSE = "Close";
 
     private static final String[] NO_NAMES = new String[0];
     private static final double[] NO_VALUES = new double[0];
 
     private final String stockId;
     private final SplitMix64Random random;
-    private final PriceHistory history;
 
     private double price;
     /** Number of price updates performed for this stock since it was created. */
@@ -52,10 +57,16 @@ public class StockState {
     private String[] variableNames = NO_NAMES;
     private double[] variableValues = NO_VALUES;
 
-    public StockState(String stockId, long seed, int historyCapacity) {
+    /** Index the next opened candle receives; equals the number of completed candles. */
+    private long nextCandleIndex;
+    /** The candle still forming, or {@code null} if no update happened since the last candle completed. */
+    @Nullable
+    private Candle formingCandle;
+    private int formingCandleUpdates;
+
+    public StockState(String stockId, long seed) {
         this.stockId = stockId;
         this.random = new SplitMix64Random(seed);
-        this.history = new PriceHistory(historyCapacity);
     }
 
     public String stockId() {
@@ -64,10 +75,6 @@ public class StockState {
 
     public SplitMix64Random random() {
         return random;
-    }
-
-    public PriceHistory history() {
-        return history;
     }
 
     public double price() {
@@ -114,6 +121,15 @@ public class StockState {
         return variableValues;
     }
 
+    public long nextCandleIndex() {
+        return nextCandleIndex;
+    }
+
+    @Nullable
+    public Candle formingCandle() {
+        return formingCandle;
+    }
+
     /** Sets the price without touching the mode context, e.g. on creation or after a bounds change. */
     public void setPrice(double price) {
         this.price = price;
@@ -142,7 +158,29 @@ public class StockState {
         this.variableValues = newVariableValues;
         this.t++;
         this.sequence++;
-        history.add(actualPrice);
+    }
+
+    /**
+     * Adds a price to the forming candle, opening it at {@code openPrice} if needed.
+     *
+     * @return the forming candle after the update
+     */
+    public Candle recordCandlePrice(double openPrice, double price) {
+        Candle base = formingCandle != null ? formingCandle : Candle.open(nextCandleIndex, openPrice);
+        formingCandle = base.withPrice(price);
+        formingCandleUpdates++;
+        return formingCandle;
+    }
+
+    public int formingCandleUpdates() {
+        return formingCandleUpdates;
+    }
+
+    /** Marks the forming candle as completed; the next recorded price opens a new candle. */
+    public void completeCandle() {
+        formingCandle = null;
+        formingCandleUpdates = 0;
+        nextCandleIndex++;
     }
 
     public NBTTagCompound writeToNBT() {
@@ -165,12 +203,21 @@ public class StockState {
         }
         tag.setTag(NBT_VARIABLES, variables);
         tag.setLong(NBT_RANDOM, random.getState());
-        tag.setTag(NBT_HISTORY, new NBTTagByteArray(encode(history.toArray())));
+        tag.setLong(NBT_NEXT_CANDLE, nextCandleIndex);
+        if (formingCandle != null) {
+            NBTTagCompound candle = new NBTTagCompound();
+            candle.setDouble(NBT_OPEN, formingCandle.open());
+            candle.setDouble(NBT_HIGH, formingCandle.high());
+            candle.setDouble(NBT_LOW, formingCandle.low());
+            candle.setDouble(NBT_CLOSE, formingCandle.close());
+            candle.setInteger(NBT_CANDLE_UPDATES, formingCandleUpdates);
+            tag.setTag(NBT_CANDLE, candle);
+        }
         return tag;
     }
 
-    public static StockState readFromNBT(String stockId, NBTTagCompound tag, int historyCapacity) {
-        StockState state = new StockState(stockId, tag.getLong(NBT_RANDOM), historyCapacity);
+    public static StockState readFromNBT(String stockId, NBTTagCompound tag) {
+        StockState state = new StockState(stockId, tag.getLong(NBT_RANDOM));
         state.price = tag.getDouble(NBT_PRICE);
         state.sequence = tag.getLong(NBT_SEQUENCE);
         state.modeId = tag.getString(NBT_MODE);
@@ -188,20 +235,17 @@ public class StockState {
             state.variableNames[i] = variable.getString(NBT_VARIABLE_NAME);
             state.variableValues[i] = variable.getDouble(NBT_VARIABLE_VALUE);
         }
-        state.history.setAll(decode(tag.getByteArray(NBT_HISTORY)));
+        state.nextCandleIndex = tag.getLong(NBT_NEXT_CANDLE);
+        if (tag.hasKey(NBT_CANDLE, Constants.NBT.TAG_COMPOUND)) {
+            NBTTagCompound candle = tag.getCompoundTag(NBT_CANDLE);
+            state.formingCandle = new Candle(
+                state.nextCandleIndex,
+                candle.getDouble(NBT_OPEN),
+                candle.getDouble(NBT_HIGH),
+                candle.getDouble(NBT_LOW),
+                candle.getDouble(NBT_CLOSE));
+            state.formingCandleUpdates = candle.getInteger(NBT_CANDLE_UPDATES);
+        }
         return state;
-    }
-
-    private static byte[] encode(double[] values) {
-        ByteBuffer buffer = ByteBuffer.allocate(values.length * Double.BYTES);
-        for (double value : values) buffer.putDouble(value);
-        return buffer.array();
-    }
-
-    private static double[] decode(byte[] bytes) {
-        ByteBuffer buffer = ByteBuffer.wrap(bytes);
-        double[] values = new double[bytes.length / Double.BYTES];
-        for (int i = 0; i < values.length; i++) values[i] = buffer.getDouble();
-        return values;
     }
 }

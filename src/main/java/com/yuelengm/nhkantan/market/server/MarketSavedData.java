@@ -6,7 +6,6 @@ import java.util.Map;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.WorldSavedData;
 
-import com.yuelengm.nhkantan.config.MarketConfig;
 import com.yuelengm.nhkantan.market.engine.StockState;
 
 /**
@@ -37,9 +36,7 @@ public class MarketSavedData extends WorldSavedData {
         states.clear();
         NBTTagCompound stocks = tag.getCompoundTag(NBT_STOCKS);
         for (String stockId : stocks.func_150296_c()) {
-            states.put(
-                stockId,
-                StockState.readFromNBT(stockId, stocks.getCompoundTag(stockId), MarketConfig.historyLength));
+            states.put(stockId, StockState.readFromNBT(stockId, stocks.getCompoundTag(stockId)));
         }
     }
 

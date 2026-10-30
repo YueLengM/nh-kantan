@@ -1,10 +1,15 @@
 package com.yuelengm.nhkantan;
 
+import java.util.function.Supplier;
+
+import com.cleanroommc.modularui.api.drawable.IKey;
+import com.cleanroommc.modularui.widget.Widget;
 import com.yuelengm.nhkantan.block.ModBlocks;
 import com.yuelengm.nhkantan.config.ModConfigs;
 import com.yuelengm.nhkantan.item.ModItems;
 import com.yuelengm.nhkantan.market.server.MarketEventHandler;
 import com.yuelengm.nhkantan.market.server.MarketService;
+import com.yuelengm.nhkantan.market.view.StockView;
 import com.yuelengm.nhkantan.network.ModNetwork;
 
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -38,5 +43,13 @@ public class CommonProxy {
 
     public void serverStopped(FMLServerStoppedEvent event) {
         MarketService.stop();
+    }
+
+    /**
+     * Creates the K-line chart widget used by market GUIs. The chart draws with client-only classes, so the common
+     * proxy returns an empty placeholder and only the client proxy creates the real widget.
+     */
+    public Widget<?> createStockChart(Supplier<StockView> stock) {
+        return IKey.EMPTY.asWidget();
     }
 }

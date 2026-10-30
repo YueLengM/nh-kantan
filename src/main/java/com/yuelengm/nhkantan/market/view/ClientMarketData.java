@@ -8,7 +8,7 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
-import com.yuelengm.nhkantan.market.PriceTick;
+import com.yuelengm.nhkantan.market.CandleUpdate;
 import com.yuelengm.nhkantan.market.StockSnapshot;
 
 /**
@@ -27,21 +27,21 @@ public class ClientMarketData {
     private ClientMarketData() {}
 
     /** Replaces all data with a full snapshot from the server. */
-    public void applySnapshot(int historyCapacity, List<StockSnapshot> snapshots) {
+    public void applySnapshot(int visibleCandles, List<StockSnapshot> snapshots) {
         Map<String, StockView> next = new LinkedHashMap<>();
         for (StockSnapshot snapshot : snapshots) {
-            next.put(snapshot.id(), new StockView(snapshot, historyCapacity));
+            next.put(snapshot.id(), new StockView(snapshot, visibleCandles));
         }
         stocks = Collections.unmodifiableMap(next);
         revision++;
     }
 
-    /** Appends new prices; ticks for unknown stocks are ignored. */
-    public void applyTicks(List<PriceTick> ticks) {
+    /** Applies the latest candles; updates for unknown stocks are ignored. */
+    public void applyUpdates(List<CandleUpdate> updates) {
         Map<String, StockView> current = stocks;
-        for (PriceTick tick : ticks) {
-            StockView view = current.get(tick.stockId());
-            if (view != null) view.applyTick(tick.sequence(), tick.price());
+        for (CandleUpdate update : updates) {
+            StockView view = current.get(update.stockId());
+            if (view != null) view.applyCandle(update.candle());
         }
         revision++;
     }

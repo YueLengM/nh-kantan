@@ -3,6 +3,7 @@ package com.yuelengm.nhkantan.network;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.yuelengm.nhkantan.market.Candle;
 import com.yuelengm.nhkantan.market.StockSnapshot;
 import com.yuelengm.nhkantan.market.view.ClientMarketData;
 
@@ -13,40 +14,40 @@ import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
 /**
- * Server to client: full public market state. Sent on login and whenever the market is (re)started.
+ * Server to client: public market state with the visible candles of every stock. Sent on login.
  */
 public class MarketSnapshotMessage implements IMessage {
 
-    private int historyCapacity;
+    private int visibleCandles;
     private List<StockSnapshot> stocks;
 
     /** Required by FML for decoding. */
     public MarketSnapshotMessage() {}
 
-    public MarketSnapshotMessage(int historyCapacity, List<StockSnapshot> stocks) {
-        this.historyCapacity = historyCapacity;
+    public MarketSnapshotMessage(int visibleCandles, List<StockSnapshot> stocks) {
+        this.visibleCandles = visibleCandles;
         this.stocks = stocks;
     }
 
     @Override
     public void toBytes(ByteBuf buf) {
-        buf.writeInt(historyCapacity);
+        buf.writeInt(visibleCandles);
         buf.writeInt(stocks.size());
         for (StockSnapshot stock : stocks) {
             ByteBufUtils.writeUTF8String(buf, stock.id());
             ByteBufUtils.writeUTF8String(buf, stock.name());
             buf.writeDouble(stock.lowerBound());
             buf.writeDouble(stock.upperBound());
-            buf.writeLong(stock.sequence());
-            double[] history = stock.history();
-            buf.writeInt(history.length);
-            for (double price : history) buf.writeDouble(price);
+            buf.writeDouble(stock.price());
+            Candle[] candles = stock.candles();
+            buf.writeInt(candles.length);
+            for (Candle candle : candles) CandleCodec.write(buf, candle);
         }
     }
 
     @Override
     public void fromBytes(ByteBuf buf) {
-        historyCapacity = buf.readInt();
+        visibleCandles = buf.readInt();
         int count = buf.readInt();
         stocks = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
@@ -54,10 +55,10 @@ public class MarketSnapshotMessage implements IMessage {
             String name = ByteBufUtils.readUTF8String(buf);
             double lowerBound = buf.readDouble();
             double upperBound = buf.readDouble();
-            long sequence = buf.readLong();
-            double[] history = new double[buf.readInt()];
-            for (int j = 0; j < history.length; j++) history[j] = buf.readDouble();
-            stocks.add(new StockSnapshot(id, name, lowerBound, upperBound, sequence, history));
+            double price = buf.readDouble();
+            Candle[] candles = new Candle[buf.readInt()];
+            for (int j = 0; j < candles.length; j++) candles[j] = CandleCodec.read(buf);
+            stocks.add(new StockSnapshot(id, name, lowerBound, upperBound, price, candles));
         }
     }
 
@@ -65,7 +66,7 @@ public class MarketSnapshotMessage implements IMessage {
 
         @Override
         public IMessage onMessage(MarketSnapshotMessage message, MessageContext ctx) {
-            ClientMarketData.INSTANCE.applySnapshot(message.historyCapacity, message.stocks);
+            ClientMarketData.INSTANCE.applySnapshot(message.visibleCandles, message.stocks);
             return null;
         }
     }

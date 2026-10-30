@@ -1,5 +1,6 @@
 package com.yuelengm.nhkantan.market.server;
 
+import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.List;
 
@@ -12,7 +13,7 @@ import net.minecraft.world.storage.MapStorage;
 import com.yuelengm.nhkantan.NHKantan;
 import com.yuelengm.nhkantan.config.ConfigPaths;
 import com.yuelengm.nhkantan.config.MarketConfig;
-import com.yuelengm.nhkantan.market.PriceTick;
+import com.yuelengm.nhkantan.market.CandleUpdate;
 import com.yuelengm.nhkantan.market.definition.DefinitionException;
 import com.yuelengm.nhkantan.market.definition.MarketDefinitionLoader;
 import com.yuelengm.nhkantan.market.definition.MarketDefinitions;
@@ -29,6 +30,8 @@ import com.yuelengm.nhkantan.network.ModNetwork;
  * how many displays or terminals they have.
  */
 public class MarketService {
+
+    private static final String CANDLE_DIRECTORY = "nhkantan/candles";
 
     @Nullable
     private static MarketService instance;
@@ -55,7 +58,8 @@ public class MarketService {
         StockMarket market = new StockMarket(
             definitions,
             savedData.states(),
-            MarketConfig.historyLength,
+            new FileCandleStore(candleDirectory(server)),
+            MarketConfig.visibleCandles,
             seeds::nextLong);
         savedData.markDirty();
         instance = new MarketService(market, savedData);
@@ -81,6 +85,15 @@ public class MarketService {
         }
     }
 
+    /** Candle history files live in the world save, next to the saved market state. */
+    private static Path candleDirectory(MinecraftServer server) {
+        return server.worldServerForDimension(0)
+            .getSaveHandler()
+            .getWorldDirectory()
+            .toPath()
+            .resolve(CANDLE_DIRECTORY);
+    }
+
     private static MarketSavedData loadSavedData(MinecraftServer server) {
         // The overworld map storage is global and shared by every dimension
         MapStorage storage = server.worldServerForDimension(0).mapStorage;
@@ -96,13 +109,13 @@ public class MarketService {
     public void tick() {
         if (market.isEmpty() || ++ticksSinceUpdate < MarketConfig.updateIntervalTicks) return;
         ticksSinceUpdate = 0;
-        List<PriceTick> ticks = market.update();
-        if (ticks.isEmpty()) return;
+        List<CandleUpdate> updates = market.update(MarketConfig.updatesPerCandle);
+        if (updates.isEmpty()) return;
         savedData.markDirty();
-        ModNetwork.CHANNEL.sendToAll(new MarketUpdateMessage(ticks));
+        ModNetwork.CHANNEL.sendToAll(new MarketUpdateMessage(updates));
     }
 
     public void sendSnapshot(EntityPlayerMP player) {
-        ModNetwork.CHANNEL.sendTo(new MarketSnapshotMessage(MarketConfig.historyLength, market.snapshots()), player);
+        ModNetwork.CHANNEL.sendTo(new MarketSnapshotMessage(MarketConfig.visibleCandles, market.snapshots()), player);
     }
 }
