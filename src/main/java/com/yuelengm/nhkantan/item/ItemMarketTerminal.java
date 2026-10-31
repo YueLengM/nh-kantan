@@ -2,6 +2,7 @@ package com.yuelengm.nhkantan.item;
 
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
@@ -16,16 +17,21 @@ import com.cleanroommc.modularui.factory.PlayerInventoryGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.ModularScreen;
 import com.cleanroommc.modularui.screen.UISettings;
+import com.cleanroommc.modularui.utils.Alignment;
 import com.cleanroommc.modularui.value.BoolValue;
+import com.cleanroommc.modularui.value.sync.InteractionSyncHandler;
+import com.cleanroommc.modularui.value.sync.LongSyncValue;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.widgets.ButtonWidget;
 import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.ToggleButton;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.yuelengm.nhkantan.NHKantan;
+import com.yuelengm.nhkantan.gui.WalletGui;
 import com.yuelengm.nhkantan.market.view.ClientMarketData;
 import com.yuelengm.nhkantan.market.view.PriceFormat;
 import com.yuelengm.nhkantan.market.view.StockView;
+import com.yuelengm.nhkantan.wallet.WalletService;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -40,7 +46,9 @@ public class ItemMarketTerminal extends Item implements IGuiHolder<PlayerInvento
     private static final int PANEL_HEIGHT = 190;
     private static final int PADDING = 7;
     private static final int GAP = 4;
-    private static final int TITLE_HEIGHT = 10;
+    private static final int TITLE_HEIGHT = 14;
+    private static final int CLOSE_BUTTON_SPACE = 12;
+    private static final int WALLET_BUTTON_WIDTH = 40;
     private static final int LIST_WIDTH = 92;
     private static final int BUTTON_HEIGHT = 22;
 
@@ -68,23 +76,68 @@ public class ItemMarketTerminal extends Item implements IGuiHolder<PlayerInvento
 
     @Override
     public ModularPanel buildUI(PlayerInventoryGuiData data, PanelSyncManager syncManager, UISettings settings) {
+        EntityPlayer player = data.getPlayer();
+        // Server reads the wallet; the client only shows the synced value
+        LongSyncValue balance = new LongSyncValue(() -> 0L, () -> walletBalance(player));
+        syncManager.syncValue("wallet_balance", balance);
+        InteractionSyncHandler openWallet = new InteractionSyncHandler()
+            .setOnMousePressed(mouse -> { if (!mouse.isClient() && mouse.mouseButton == 0) openWallet(player); });
+
         ModularPanel panel = ModularPanel.defaultPanel("nhkantan_market_terminal", PANEL_WIDTH, PANEL_HEIGHT);
         Flow column = Flow.column()
             .widthRel(1f)
             .heightRel(1f)
             .padding(PADDING)
             .childPadding(GAP)
-            .child(
-                IKey.lang("gui.nhkantan.market_terminal.title")
-                    .asWidget()
-                    .left(0)
-                    .height(TITLE_HEIGHT));
+            .child(header(balance, openWallet));
         // Market data only exists on the client; the server-side copy of the panel carries no market widgets
         if (data.getPlayer().worldObj.isRemote) {
             column.child(marketView());
         }
         return panel.child(column)
             .child(ButtonWidget.panelCloseButton());
+    }
+
+    /** Server: switches from the terminal to the wallet window. */
+    private static void openWallet(EntityPlayer player) {
+        if (player instanceof EntityPlayerMP serverPlayer) WalletGui.open(serverPlayer);
+    }
+
+    /** Whether the player holds a market terminal in the main hand; required to keep market GUIs open. */
+    public static boolean isHeldBy(EntityPlayer player) {
+        ItemStack held = player.getHeldItem();
+        return held != null && held.getItem() instanceof ItemMarketTerminal;
+    }
+
+    private static long walletBalance(EntityPlayer player) {
+        WalletService service = WalletService.get();
+        return service == null ? 0L : service.balance(player.getUniqueID());
+    }
+
+    /** Title on the left; balance and the wallet button on the right, clear of the close button. */
+    private static Flow header(LongSyncValue balance, InteractionSyncHandler openWallet) {
+        int width = PANEL_WIDTH - PADDING * 2 - CLOSE_BUTTON_SPACE;
+        int textWidth = (width - WALLET_BUTTON_WIDTH - GAP * 2) / 2;
+        return Flow.row()
+            .width(width)
+            .height(TITLE_HEIGHT)
+            .childPadding(GAP)
+            .child(
+                IKey.lang("gui.nhkantan.market_terminal.title")
+                    .asWidget()
+                    .width(textWidth)
+                    .height(TITLE_HEIGHT)
+                    .textAlign(Alignment.CenterLeft))
+            .child(
+                IKey.dynamic(() -> WalletGui.formatBalance(balance.getLongValue()))
+                    .asWidget()
+                    .width(textWidth)
+                    .height(TITLE_HEIGHT)
+                    .textAlign(Alignment.CenterRight))
+            .child(
+                new ButtonWidget<>().size(WALLET_BUTTON_WIDTH, TITLE_HEIGHT)
+                    .overlay(IKey.lang("gui.nhkantan.wallet.button"))
+                    .syncHandler(openWallet));
     }
 
     /** Stock list on the left, chart of the selected stock on the right. */

@@ -9,7 +9,8 @@ import com.yuelengm.nhkantan.NHKantan;
     configSubDirectory = ConfigPaths.DIRECTORY_NAME,
     filename = ConfigPaths.CONFIG_FILE_NAME)
 @Config.LangKeyPattern
-@Config.Comment("Market account currency.")
+@Config.Sync
+@Config.Comment("Market account currency. Synced to clients.")
 public class CurrencyConfig {
 
     @Config.Comment("Display name of the market currency.")
