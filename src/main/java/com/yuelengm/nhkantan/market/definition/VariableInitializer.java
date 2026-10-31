@@ -1,6 +1,6 @@
 package com.yuelengm.nhkantan.market.definition;
 
-import com.yuelengm.nhkantan.market.random.RandomSource;
+import java.util.Random;
 
 /**
  * Produces the value of a mode variable each time the mode is entered.
@@ -8,7 +8,7 @@ import com.yuelengm.nhkantan.market.random.RandomSource;
 @FunctionalInterface
 public interface VariableInitializer {
 
-    double initialValue(RandomSource random);
+    double initialValue(Random random);
 
     static VariableInitializer constant(double value) {
         return random -> value;

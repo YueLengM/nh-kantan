@@ -1,13 +1,13 @@
 package com.yuelengm.nhkantan.market.engine;
 
 import java.util.List;
+import java.util.Random;
 
 import com.yuelengm.nhkantan.market.definition.ModeDefinition;
 import com.yuelengm.nhkantan.market.definition.ModeVariable;
 import com.yuelengm.nhkantan.market.definition.StockDefinition;
 import com.yuelengm.nhkantan.market.definition.StockModeEntry;
 import com.yuelengm.nhkantan.market.definition.SystemVariables;
-import com.yuelengm.nhkantan.market.random.SplitMix64Random;
 
 /**
  * Stateless price stepping logic. Each step follows the web configurator exactly:
@@ -24,12 +24,12 @@ public class PriceEngine {
     private PriceEngine() {}
 
     /** Picks a mode by weight among all selectable modes and enters it. */
-    public static void enterRandomMode(StockDefinition stock, StockState state) {
-        enterMode(state, ModeSelector.choose(stock.selectableModes(), state.random(), null));
+    public static void enterRandomMode(StockDefinition stock, StockState state, Random random) {
+        enterMode(state, ModeSelector.choose(stock.selectableModes(), random, null), random);
     }
 
     /** Enters the mode: resets the context to the current price and initializes the mode variables. */
-    public static void enterMode(StockState state, StockModeEntry entry) {
+    public static void enterMode(StockState state, StockModeEntry entry, Random random) {
         ModeDefinition mode = entry.mode();
         List<ModeVariable> variables = mode.variables();
         String[] names = new String[variables.size()];
@@ -39,7 +39,7 @@ public class PriceEngine {
             names[i] = variable.name();
             values[i] = requireFinite(
                 variable.initializer()
-                    .initialValue(state.random()),
+                    .initialValue(random),
                 mode,
                 "initial value of '" + variable.name() + "'");
         }
@@ -47,32 +47,11 @@ public class PriceEngine {
     }
 
     /**
-     * Whether the state's mode is still runnable by the stock with the same variable layout. When false, the state
-     * must re-enter a mode before stepping.
-     */
-    public static boolean isModeCompatible(StockDefinition stock, StockState state) {
-        StockModeEntry entry = stock.findSelectableMode(state.modeId());
-        if (entry == null) return false;
-        List<ModeVariable> variables = entry.mode()
-            .variables();
-        String[] names = state.variableNames();
-        if (names.length != variables.size()) return false;
-        for (int i = 0; i < names.length; i++) {
-            if (!names[i].equals(
-                variables.get(i)
-                    .name()))
-                return false;
-        }
-        return true;
-    }
-
-    /**
-     * Performs one price update. The state must be mode-compatible with the stock.
+     * Performs one price update. The state must be in one of the stock's selectable modes.
      *
      * @throws PriceEvaluationException if a formula produces a non-finite value; the price is left unchanged
      */
-    public static void step(StockDefinition stock, StockState state) {
-        SplitMix64Random random = state.random();
+    public static void step(StockDefinition stock, StockState state, Random random) {
         StockModeEntry entry = stock.findSelectableMode(state.modeId());
         if (entry == null) {
             throw new IllegalStateException("Stock '" + stock.id() + "' is not in a runnable mode");
@@ -80,7 +59,7 @@ public class PriceEngine {
         if (random.nextDouble() < entry.switchProbability()) {
             StockModeEntry next = ModeSelector.choose(stock.selectableModes(), random, entry.modeId());
             if (next != entry) {
-                enterMode(state, next);
+                enterMode(state, next, random);
                 entry = next;
             }
         }

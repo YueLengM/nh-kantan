@@ -1,5 +1,7 @@
 package com.yuelengm.nhkantan.client.render;
 
+import java.util.List;
+
 import javax.annotation.Nullable;
 
 import net.minecraft.client.gui.FontRenderer;
@@ -8,8 +10,7 @@ import net.minecraft.util.StatCollector;
 
 import org.lwjgl.opengl.GL11;
 
-import com.yuelengm.nhkantan.market.Candle;
-import com.yuelengm.nhkantan.market.CandleWindow;
+import com.yuelengm.nhkantan.market.view.Candle;
 import com.yuelengm.nhkantan.market.view.PriceFormat;
 import com.yuelengm.nhkantan.market.view.StockView;
 
@@ -36,7 +37,6 @@ public class StockPanelRenderer {
     private static final float PADDING = 4.0F;
     private static final float LINE_GAP = 2.0F;
     private static final float BODY_RATIO = 0.6F;
-    private static final float WICK_RATIO = 0.12F;
     private static final float DASH = 3.0F;
     private static final float DASH_GAP = 2.0F;
 
@@ -94,11 +94,10 @@ public class StockPanelRenderer {
 
     private static void drawChart(FontRenderer font, StockView stock, float x0, float y0, float x1, float y1,
         float unit, float z, float zStep) {
-        CandleWindow candles = stock.candles();
+        List<Candle> candles = stock.candles();
         double min = stock.price();
         double max = stock.price();
-        for (int i = 0; i < candles.size(); i++) {
-            Candle candle = candles.get(i);
+        for (Candle candle : candles) {
             min = Math.min(min, candle.low());
             max = Math.max(max, candle.high());
         }
@@ -123,7 +122,7 @@ public class StockPanelRenderer {
             float gy = y0 + (y1 - y0) * i / (GRID_LEVELS - 1);
             quad(tessellator, x0, gy, plotRight, gy + unit * 0.5F, z, COLOR_GRID);
         }
-        drawCandles(tessellator, candles, scale, x0, plotRight, unit, z + zStep);
+        drawCandles(tessellator, candles, stock.candleSlots(), scale, x0, plotRight, unit, z + zStep);
         float priceY = scale.y(stock.price());
         int priceColor = colorOf(stock.windowChange());
         for (float dx = x0; dx < plotRight; dx += (DASH + DASH_GAP) * unit) {
@@ -151,22 +150,22 @@ public class StockPanelRenderer {
             COLOR_PRICE_TAG_TEXT);
     }
 
-    /** Candles are right-aligned in a fixed number of slots, one slot per visible candle. */
-    private static void drawCandles(Tessellator tessellator, CandleWindow candles, PriceScale scale, float x0, float x1,
-        float unit, float z) {
-        int slots = candles.capacity();
+    /**
+     * Candles are right-aligned in a fixed number of slots. Each candle spans two consecutive prices, so it has no
+     * wicks.
+     */
+    private static void drawCandles(Tessellator tessellator, List<Candle> candles, int slots, PriceScale scale,
+        float x0, float x1, float unit, float z) {
         int first = slots - candles.size();
         float slotWidth = (x1 - x0) / slots;
         float bodyHalf = Math.max(unit, slotWidth * BODY_RATIO) * 0.5F;
-        float wickHalf = Math.min(bodyHalf, Math.max(unit * 0.5F, slotWidth * WICK_RATIO)) * 0.5F;
         float minBody = unit * 0.5F;
         for (int i = 0; i < candles.size(); i++) {
             Candle candle = candles.get(i);
             float cx = x0 + (first + i + 0.5F) * slotWidth;
             int color = candle.isRising() ? COLOR_UP : COLOR_DOWN;
-            quad(tessellator, cx - wickHalf, scale.y(candle.high()), cx + wickHalf, scale.y(candle.low()), z, color);
-            float top = scale.y(Math.max(candle.open(), candle.close()));
-            float bottom = scale.y(Math.min(candle.open(), candle.close()));
+            float top = scale.y(candle.high());
+            float bottom = scale.y(candle.low());
             if (bottom - top < minBody) {
                 float center = (top + bottom) * 0.5F;
                 top = center - minBody * 0.5F;

@@ -2,11 +2,11 @@ package com.yuelengm.nhkantan.market.engine;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import javax.annotation.Nullable;
 
 import com.yuelengm.nhkantan.market.definition.StockModeEntry;
-import com.yuelengm.nhkantan.market.random.RandomSource;
 
 /**
  * Weighted mode selection, identical to the web configurator.
@@ -21,7 +21,7 @@ public class ModeSelector {
      *
      * @param candidates non-empty list of entries with positive weight
      */
-    public static StockModeEntry choose(List<StockModeEntry> candidates, RandomSource random,
+    public static StockModeEntry choose(List<StockModeEntry> candidates, Random random,
         @Nullable String excludeModeId) {
         List<StockModeEntry> pool = candidates;
         if (excludeModeId != null) {

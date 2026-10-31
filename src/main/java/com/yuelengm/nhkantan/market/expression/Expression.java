@@ -1,6 +1,6 @@
 package com.yuelengm.nhkantan.market.expression;
 
-import com.yuelengm.nhkantan.market.random.RandomSource;
+import java.util.Random;
 
 /**
  * A compiled formula. Variables are resolved to slots at compile time, see {@link VariableScope}.
@@ -13,5 +13,5 @@ public interface Expression {
      * @param random    random source used by {@code random(min, max)}
      * @return the result, which may be non-finite; callers decide how to treat that
      */
-    double evaluate(double[] variables, RandomSource random);
+    double evaluate(double[] variables, Random random);
 }

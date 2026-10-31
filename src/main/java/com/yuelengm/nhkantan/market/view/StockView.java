@@ -1,14 +1,15 @@
 package com.yuelengm.nhkantan.market.view;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
-import com.yuelengm.nhkantan.market.Candle;
-import com.yuelengm.nhkantan.market.CandleWindow;
+import com.yuelengm.nhkantan.market.PriceWindow;
 import com.yuelengm.nhkantan.market.StockSnapshot;
 
 /**
- * Client copy of a stock's public data: current price and the visible candles only. Candles that scroll out of the
- * window are dropped; the client never keeps older history.
+ * Client copy of a stock's public data: the most recent prices only, plus the candles derived from them. Prices that
+ * scroll out of the window are dropped; the client never keeps older history.
  */
 public class StockView {
 
@@ -16,17 +17,20 @@ public class StockView {
     private final String name;
     private final double lowerBound;
     private final double upperBound;
-    private final CandleWindow candles;
-    private double price;
+    private final PriceWindow prices;
+    private List<Candle> candles = Collections.emptyList();
 
-    public StockView(StockSnapshot snapshot, int visibleCandles) {
+    /**
+     * @param recentPrices number of prices kept; yields one candle less
+     */
+    public StockView(StockSnapshot snapshot, int recentPrices) {
         this.id = snapshot.id();
         this.name = snapshot.name();
         this.lowerBound = snapshot.lowerBound();
         this.upperBound = snapshot.upperBound();
-        this.candles = new CandleWindow(visibleCandles);
-        this.candles.upsertAll(Arrays.asList(snapshot.candles()));
-        this.price = snapshot.price();
+        this.prices = new PriceWindow(recentPrices);
+        this.prices.addAll(snapshot.prices());
+        rebuildCandles();
     }
 
     public String id() {
@@ -45,25 +49,36 @@ public class StockView {
         return upperBound;
     }
 
-    /** Visible candles, oldest first; the newest may still be forming. Read only. */
-    public CandleWindow candles() {
+    public float price() {
+        return prices.latest();
+    }
+
+    /** Visible candles, oldest first. Read only. */
+    public List<Candle> candles() {
         return candles;
     }
 
-    public double price() {
-        return price;
+    /** Number of candle slots on the chart's horizontal axis, independent of how many candles exist yet. */
+    public int candleSlots() {
+        return prices.capacity() - 1;
     }
 
-    /** Relative change since the open of the oldest visible candle, e.g. {@code 0.05} for +5%. */
+    /** Relative change over the visible window, e.g. {@code 0.05} for +5%. */
     public double windowChange() {
-        Candle oldest = candles.oldest();
-        return oldest == null ? 0.0D : price / oldest.open() - 1.0D;
+        return (double) prices.latest() / prices.get(0) - 1.0D;
     }
 
-    public void applyCandle(Candle candle) {
-        Candle latest = candles.latest();
-        if (latest != null && candle.index() < latest.index()) return;
-        candles.upsert(candle);
-        price = candle.close();
+    public void applyPrice(float price) {
+        prices.add(price);
+        rebuildCandles();
+    }
+
+    /** Candles are rebuilt once per price update so renderers can read them every frame without allocating. */
+    private void rebuildCandles() {
+        List<Candle> next = new ArrayList<>(Math.max(0, prices.size() - 1));
+        for (int i = 1; i < prices.size(); i++) {
+            next.add(new Candle(prices.get(i - 1), prices.get(i)));
+        }
+        candles = Collections.unmodifiableList(next);
     }
 }
