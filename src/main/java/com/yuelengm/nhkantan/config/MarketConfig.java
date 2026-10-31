@@ -13,7 +13,7 @@ import com.yuelengm.nhkantan.NHKantan;
 public class MarketConfig {
 
     @Config.Comment("Server ticks between two price updates. Prices only advance while the server is running.")
-    @Config.DefaultInt(100)
+    @Config.DefaultInt(40)
     @Config.RangeInt(min = 1, max = 72000)
     public static int updateIntervalTicks;
 

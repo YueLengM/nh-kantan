@@ -61,8 +61,7 @@ public class MathFunctions {
         unary(functions, "abs", Math::abs);
         unary(functions, "floor", Math::floor);
         unary(functions, "ceil", Math::ceil);
-        // Same as Java Math.round: halves round toward positive infinity
-        unary(functions, "round", x -> Math.floor(x + 0.5D));
+        unary(functions, "round", Math::round);
         unary(functions, "exp", Math::exp);
         functions.put("log", new Spec(1, 2, a -> a.length == 1 ? Math.log(a[0]) : Math.log(a[0]) / Math.log(a[1])));
         functions.put("min", new Spec(1, Integer.MAX_VALUE, MathFunctions::min));

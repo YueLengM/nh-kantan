@@ -11,23 +11,18 @@
       "modes": [
         {
           "modeId": "calm",
-          "weight": 5,
+          "weight": 7,
           "switchProbability": 0.04
         },
         {
-          "modeId": "sine",
-          "weight": 3,
-          "switchProbability": 0.025
-        },
-        {
           "modeId": "volatile",
-          "weight": 1,
+          "weight": 2,
           "switchProbability": 0.1
         },
         {
-          "modeId": "absolute_demo",
-          "weight": 0,
-          "switchProbability": 0.05
+          "modeId": "pull_back",
+          "weight": 1,
+          "switchProbability": 0.8
         }
       ]
     }
