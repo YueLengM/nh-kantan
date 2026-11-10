@@ -1,5 +1,6 @@
 package com.yuelengm.nhkantan.wallet;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -20,6 +21,11 @@ public class WalletSavedData extends WorldSavedData {
     private static final String NBT_LEGACY_BALANCES = "Balances";
 
     private final Map<UUID, Long> balances = new HashMap<>();
+
+    /** Detached server-side balances for the one-time equity migration. Never send this map to clients. */
+    public Map<UUID, Long> snapshot() {
+        return Collections.unmodifiableMap(new HashMap<>(balances));
+    }
 
     /** Constructor required by the map storage, which instantiates saved data reflectively. */
     public WalletSavedData(String name) {
@@ -43,14 +49,17 @@ public class WalletSavedData extends WorldSavedData {
     @Override
     public void readFromNBT(NBTTagCompound tag) {
         balances.clear();
+        if (tag.hasKey(NBT_BALANCES) && !tag.hasKey(NBT_BALANCES, 10))
+            throw new IllegalArgumentException("Invalid cents balance container");
         boolean legacy = !tag.hasKey(NBT_BALANCES);
         NBTTagCompound stored = tag.getCompoundTag(legacy ? NBT_LEGACY_BALANCES : NBT_BALANCES);
         for (String key : stored.func_150296_c()) {
             try {
+                if (!stored.hasKey(key, 99)) throw new IllegalArgumentException("Balance is not numeric");
                 long value = stored.getLong(key);
                 balances.put(UUID.fromString(key), legacy ? Money.cents(value) : value);
-            } catch (IllegalArgumentException ignored) {
-                // Not a UUID; skip the corrupt entry
+            } catch (IllegalArgumentException error) {
+                throw new IllegalArgumentException("Invalid legacy wallet entry: " + key, error);
             }
         }
     }

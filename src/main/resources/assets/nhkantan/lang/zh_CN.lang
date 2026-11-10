@@ -95,3 +95,101 @@ gui.nhkantan.trading.notional=名义仓位
 gui.nhkantan.trading.fee=手续费
 gui.nhkantan.trading.liquidation_move=可承受波动
 gui.nhkantan.trading.liquidation_off=已关闭
+
+gui.nhkantan.exchange.title=交易终端
+gui.nhkantan.exchange.trade_tab=交易
+gui.nhkantan.exchange.wallet_tab=钱包
+gui.nhkantan.exchange.loading=正在同步账户
+gui.nhkantan.exchange.summary=余额 %s · 权益 %s · 可用 %s · 冻结 %s
+gui.nhkantan.exchange.quantity=合约 / 基础物品数量
+gui.nhkantan.exchange.price_ticks=限价（价格跳动单位）
+gui.nhkantan.exchange.market=市价单
+gui.nhkantan.exchange.limit=限价单
+gui.nhkantan.exchange.buy=买入
+gui.nhkantan.exchange.sell=卖出
+gui.nhkantan.exchange.close_quantity=部分平仓
+gui.nhkantan.exchange.close_all=全部平仓
+gui.nhkantan.exchange.stop_ticks=止损价（价格跳动单位）
+gui.nhkantan.exchange.take_ticks=止盈价（价格跳动单位）
+gui.nhkantan.exchange.protect=设置保护
+gui.nhkantan.exchange.cancel=撤单
+gui.nhkantan.exchange.wallet_inventory=从背包直接存取所选货币；数量按基础面额计算
+gui.nhkantan.exchange.repay=还债
+gui.nhkantan.exchange.deposit=存入
+gui.nhkantan.exchange.withdraw=取出
+gui.nhkantan.exchange.status.ready=就绪
+gui.nhkantan.exchange.status.ok=操作已确认
+gui.nhkantan.exchange.status.pending=正在等待确认
+gui.nhkantan.exchange.status.rejected=操作未完成，请检查可用资金、数量、价格和交易状态
+gui.nhkantan.exchange.margin=保证金率 %s%% · 手续费 %s%%
+gui.nhkantan.exchange.max_quantity=估算最多
+gui.nhkantan.exchange.step_hint=按住 Shift 每次调整 10 个
+
+gui.nhkantan.exchange.options_tab=期权
+gui.nhkantan.exchange.option_rules=现金结算期权 · 1–14 游戏日 · 支持提前行权与做市商回购
+gui.nhkantan.exchange.buy_option=买入期权
+gui.nhkantan.exchange.days=剩余 %s 游戏日
+gui.nhkantan.exchange.chart_hint=15 秒 K 线 · 左键拖动 · 右键回到最新
+gui.nhkantan.exchange.limit_price=委托价格（NHC）
+gui.nhkantan.exchange.protection_title=◆ 仓位保护
+gui.nhkantan.exchange.profit_mode=模式：盈亏金额 ⇄ 价格
+gui.nhkantan.exchange.price_mode=模式：价格 ⇄ 盈亏金额
+gui.nhkantan.exchange.stop_loss=止损金额（NHC，正数）
+gui.nhkantan.exchange.take_profit=止盈金额（NHC，正数）
+gui.nhkantan.exchange.stop_price=止损价格（NHC，0 关闭）
+gui.nhkantan.exchange.take_price=止盈价格（NHC，0 关闭）
+gui.nhkantan.exchange.protection_preview=止损 %s / 止盈 %s
+gui.nhkantan.exchange.protection_hint=按上方合约数量保护；金额不含费用
+gui.nhkantan.exchange.instruments=◆ 交易品种
+gui.nhkantan.exchange.positions_orders=◆ 持仓与活动订单
+gui.nhkantan.exchange.position_line=持仓
+gui.nhkantan.exchange.stop_line=止损
+gui.nhkantan.exchange.take_line=止盈
+gui.nhkantan.exchange.order_line=挂单
+gui.nhkantan.exchange.invalid_input=请检查输入、持仓和保护数量
+gui.nhkantan.exchange.expiry_tab=%s 天
+gui.nhkantan.exchange.option_quantity=买入数量（份）
+gui.nhkantan.exchange.call_column=看涨 Call · 权利金 / 点击买入
+gui.nhkantan.exchange.put_column=看跌 Put · 权利金 / 点击买入
+gui.nhkantan.exchange.strike_column=执行价（NHC）
+gui.nhkantan.exchange.option_holdings=◆ 本期限持仓 · 上方数量控制部分平仓 / 行权
+gui.nhkantan.exchange.exercise_option=行权
+gui.nhkantan.exchange.close_option=平仓
+gui.nhkantan.exchange.closing=平仓中
+gui.nhkantan.exchange.exercise_hint=按最新标的内在价值提前现金结算，放弃时间价值；仅实值可行权。到账不足预览值将拒绝，请刷新重试。
+gui.nhkantan.exchange.close_option_hint=按做市商回购价平仓（保留时间价值，含买卖价差）；过期报价或到账低于预览值将拒绝。
+gui.nhkantan.exchange.buyback_quote=做市商回购价：%s（持仓栏可部分平仓）
+
+message.nhkantan.market_unavailable=市场因配置或存档不兼容而暂停，世界仍可正常使用。请查看日志中的 Market startup disabled，修正配置后重进世界；不要删除账本。
+
+notification.nhkantan.stop_triggered.title=止损已触发
+notification.nhkantan.stop_triggered.body=%s · 保护 %s 张
+notification.nhkantan.stop_triggered.detail=触发价 %s NHC · 市价减仓
+notification.nhkantan.take_filled.title=止盈开始成交
+notification.nhkantan.take_filled.body=%s · 本次成交 %s 张
+notification.nhkantan.take_filled.detail=成交价 %s NHC
+notification.nhkantan.option_expired.title=期权已到期结算
+notification.nhkantan.option_expired.body=%s · 到期 %s 份
+notification.nhkantan.option_expired.detail=结算到账 %s
+
+gui.nhkantan.exchange.effective_leverage=等效杠杆 %s× · 合约持仓总名义价值 / 账户权益
+
+gui.nhkantan.exchange.leverage_limits=账户实际杠杆 %s× · 品种理论杠杆 %s× · 每品种限仓 %s 张
+
+gui.nhkantan.exchange.status.position_limit=超过品种限仓（含同方向活动挂单），请减少数量或取消挂单
+
+gui.nhkantan.exchange.status.insufficient_funds=可用资金不足以预留保证金与手续费（卖单按价格上界预留）
+
+gui.nhkantan.exchange.status.reduce_only=减仓数量超过当前可平持仓
+
+gui.nhkantan.exchange.status.invalid_order=账户、价格或订单参数无效
+
+gui.nhkantan.exchange.status.arithmetic_limit=金额超出安全计算范围
+
+gui.nhkantan.exchange.status.no_liquidity=价格保护范围内暂无可成交对手单，订单未成交
+
+notification.nhkantan.liquidation_triggered.title=强制平仓已触发
+
+notification.nhkantan.liquidation_triggered.body=%s · 风险减仓目标 %s 张
+
+notification.nhkantan.liquidation_triggered.detail=触发参考价 %s NHC · 按盘口成交，可能部分成交
