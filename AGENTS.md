@@ -259,3 +259,12 @@ python3 /workspace/.cloud-setup/server-status.py
 
 - 用户提供35项测试1失败的摘要，未包含用例详情；本地一轮test复现2失败：AtomicMarketStoreTest清理遗漏legacy-backup目录、ExchangeRuntimeTest机器人采样命令可能同泵完成而事件尚未执行。前者递归清理临时目录并新增备份字节保留断言；后者按8秒截止时间轮询、间隔25ms让出执行机会并维持活动时钟，继续要求真实撮合。不要删除测试/备份或修改行情算法来绕过。
 - 本次用户要求排查CI，因此仅针对本任务执行现有Java测试及完整build；这是此前“只打包”约束的任务内例外。不启动MC。`spotlessApply build`通过，35项测试0失败/0错误/0跳过，Spotless与主代码/测试Checkstyle通过；该结果是本地验证，未取得GitHub后续重跑结果。
+
+### GUI 服务端翻译隔离修复
+
+- 修复ExchangeGui共享buildUI中的客户端翻译泄漏：标题、通用按钮、期权期限标签改用IKey.comp组合延迟语言键，不提前调用LangKey.get；需要产出String的动态文字统一使用Minecraft公共侧StatCollector，避开ModularUI的ClientScreenHandler.getTicks缓存。buildUI仍在两端构建同步结构，createScreen保留客户端隔离。只做spotlessApply/checkstyleMain/assemble，不运行测试或MC，未以真实专用服务器复现验收；不改行情、账户或同步协议。
+- 后续共享GUI构建禁止调用IKey.lang(...).get()；优先传IKey.lang/comp对象，由客户端绘制时求值。需要公共侧字符串时使用StatCollector。产物build/libs/nhkantan-server-gui-fix.jar。
+
+### GUI 修复后的专用服务器验证
+
+- 专用服务器验证（业务基线81607ac）：隔离目录run/server-gui-probe、独立新世界、127.0.0.1:25566、Java8/Forge1.7.10；启动和协议5状态查询通过，响应含nhkantan=81607ac。临时探针使用与GuiManager服务端相同的RecipeViewerSettings.DUMMY，在物理SERVER侧为交易/钱包执行工厂createPanel(buildUI)、WidgetTree.collectSyncValues和ModularContainer.construct，二者PASS；无ClientScreenHandler目标异常，行情继续真实成交，stop正常保存退出、Gradle成功。第一次探针使用UISettings默认构造器导致测试工具自己的客户端设置错误，改用服务端参数后重跑通过，未修改生产代码。未验证真人登录、网络打开窗口和按钮交互；临时探针未进入正式JAR，停服后已从测试mods目录移除。日志在/workspace/.cloud-setup/gui-server-probe-fixed.log，状态响应gui-server-probe-status.json。
