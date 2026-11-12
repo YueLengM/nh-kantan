@@ -83,10 +83,7 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
             .height(20)
             .childPadding(3)
             .child(
-                Widgets.text(
-                    IKey.str(
-                        "§b◆ §f" + IKey.lang("gui.nhkantan.exchange.title")
-                            .get()))
+                Widgets.text(IKey.comp(IKey.str("§b◆ §f"), IKey.lang("gui.nhkantan.exchange.title")))
                     .expanded())
             .child(button("trade_tab", () -> state.page = 0))
             .child(button("wallet_tab", () -> sync.callSyncedAction("exchange_wallet_open", packet -> {})))
@@ -131,10 +128,7 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
                 new Rectangle().color(0xFF345675),
                 new Rectangle().color(0xFF64D9E9)
                     .hollow(1))
-            .overlay(
-                IKey.str(
-                    "§f" + IKey.lang("gui.nhkantan.exchange." + key)
-                        .get()))
+            .overlay(IKey.comp(IKey.str("§f"), IKey.lang("gui.nhkantan.exchange." + key)))
             .onMousePressed(GuiActions.leftClick(action));
     }
 
