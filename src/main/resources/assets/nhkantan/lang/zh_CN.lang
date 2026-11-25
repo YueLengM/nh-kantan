@@ -156,8 +156,6 @@ gui.nhkantan.exchange.option_holdings=◆ 本期限持仓 · 上方数量控制�
 gui.nhkantan.exchange.exercise_option=行权
 gui.nhkantan.exchange.close_option=平仓
 gui.nhkantan.exchange.closing=平仓中
-gui.nhkantan.exchange.exercise_hint=按最新标的内在价值提前现金结算，放弃时间价值；仅实值可行权。到账不足预览值将拒绝，请刷新重试。
-gui.nhkantan.exchange.close_option_hint=按做市商回购价平仓（保留时间价值，含买卖价差）；过期报价或到账低于预览值将拒绝。
 gui.nhkantan.exchange.buyback_quote=做市商回购价：%s（持仓栏可部分平仓）
 
 message.nhkantan.market_unavailable=市场因配置或存档不兼容而暂停，世界仍可正常使用。请查看日志中的 Market startup disabled，修正配置后重进世界；不要删除账本。
@@ -187,6 +185,27 @@ gui.nhkantan.exchange.status.invalid_order=账户、价格或订单参数无效
 gui.nhkantan.exchange.status.arithmetic_limit=金额超出安全计算范围
 
 gui.nhkantan.exchange.status.no_liquidity=价格保护范围内暂无可成交对手单，订单未成交
+gui.nhkantan.exchange.holding_avg=均价 %s
+gui.nhkantan.exchange.holding_units=%s份
+gui.nhkantan.exchange.holding_call=看涨
+gui.nhkantan.exchange.holding_put=看跌
+gui.nhkantan.exchange.summary_tab=汇总
+gui.nhkantan.exchange.summary_cost=总成本
+gui.nhkantan.exchange.summary_value=当前价值
+gui.nhkantan.exchange.summary_pnl=总盈亏
+gui.nhkantan.exchange.summary_name=标的
+gui.nhkantan.exchange.summary_expiry=到期
+gui.nhkantan.exchange.summary_units=份数
+gui.nhkantan.exchange.summary_kind=方向
+gui.nhkantan.exchange.summary_strike=行权价
+gui.nhkantan.exchange.summary_avg=均价
+gui.nhkantan.exchange.summary_rate=收益率
+gui.nhkantan.exchange.summary_pnl_column=盈亏
+gui.nhkantan.exchange.summary_actions=操作
+gui.nhkantan.exchange.summary_quantity=处理数量
+gui.nhkantan.exchange.summary_all=全部
+gui.nhkantan.exchange.summary_day_unit=天
+gui.nhkantan.exchange.summary_empty=暂无未结算的期权持仓
 
 notification.nhkantan.liquidation_triggered.title=强制平仓已触发
 

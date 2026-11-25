@@ -28,6 +28,7 @@ import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.value.sync.StringSyncValue;
 import com.cleanroommc.modularui.widgets.ButtonWidget;
 import com.cleanroommc.modularui.widgets.ListWidget;
+import com.cleanroommc.modularui.widgets.TextWidget;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
 import com.google.gson.Gson;
@@ -88,7 +89,8 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
                     .expanded())
             .child(button("trade_tab", () -> state.page = 0))
             .child(button("wallet_tab", () -> sync.callSyncedAction("exchange_wallet_open", packet -> {})))
-            .child(button("options_tab", () -> state.page = 2));
+            .child(button("options_tab", () -> state.page = 2))
+            .child(button("summary_tab", () -> state.page = 3));
         Flow layout = Flow.column()
             .full()
             .childPadding(3)
@@ -144,6 +146,12 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
 
     private static final class State {
 
+        /** Client-side exit tolerance: accept a payout up to 2% below the last preview in fast markets. */
+        private static final int EXIT_SLIPPAGE_BPS = 200;
+
+        /** Above this content width the summary table keeps the author's inline action buttons. */
+        private static final int SUMMARY_INLINE_WIDTH = 700;
+
         private final EntityPlayer player;
         private final PanelSyncManager sync;
         private final StringSyncValue snapshot;
@@ -177,15 +185,19 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
             this.sync = sync;
             snapshot = new StringSyncValue(() -> "{}", () -> {
                 RealisticService service = RealisticService.get();
-                return service == null || !(player instanceof EntityPlayerMP) ? "{}"
-                    : service.privateView((EntityPlayerMP) player, page == 2 ? selected : null, expiryDay);
+                if (service == null || !(player instanceof EntityPlayerMP)) return "{}";
+                EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
+                return page == 3 ? service.optionSummary(serverPlayer)
+                    : service.privateView(serverPlayer, page == 2 ? selected : null, expiryDay);
             });
             feedback = new StringSyncValue(() -> "", result::get);
             sync.registerSyncedAction("exchange_view", Side.SERVER, packet -> {
                 int requestedPage = packet.readUnsignedByte();
                 String instrument = ByteBufUtils.readUTF8String(packet);
                 int day = packet.readUnsignedByte();
-                if ((requestedPage == 0 || requestedPage == 2) && instrument.length() <= 128 && day >= 1 && day <= 14) {
+                if ((requestedPage == 0 || requestedPage == 2 || requestedPage == 3) && instrument.length() <= 128
+                    && day >= 1
+                    && day <= 14) {
                     page = requestedPage;
                     selected = instrument;
                     expiryDay = day;
@@ -398,6 +410,7 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
                     packet.writeByte(expiryDay);
                 });
             }
+            boolean inlineSummary = page == 3 && summaryInline(container);
             StringBuilder key = new StringBuilder().append(page)
                 .append(':')
                 .append(selected)
@@ -419,12 +432,15 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
             if (page == 2 && frame != null) key.append(frame.gameTick / 24000);
             if (page == 2 && account != null && account.quotes != null) key.append(account.quotes.keySet())
                 .append(new Gson().toJson(account.options));
+            if (page == 3 && account != null) key.append(new Gson().toJson(account.options));
+            if (page == 3) key.append(inlineSummary);
             String nextStructure = key.toString();
             if (renderedPage == page && structure.equals(nextStructure)) return;
             structure = nextStructure;
             renderedPage = page;
             container.removeAll();
             if (page == 2) optionPage(container);
+            else if (page == 3) summaryPage(container, inlineSummary);
             else trade(container);
             if (container.isValid()) container.scheduleResize();
         }
@@ -1001,26 +1017,310 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
             chain.child(label("option_holdings"));
             if (account.options != null) for (OptionMarket.Holding held : account.options) {
                 if (held.remainingQuantity() == 0) continue;
-                chain.child(
-                    Flow.column()
-                        .fullWidth()
-                        .height(43)
-                        .childPadding(3)
-                        .child(
-                            Widgets.text(IKey.dynamic(() -> optionHoldingLabel(held.id)))
-                                .color(0xFFDAE5F5)
-                                .fullWidth())
-                        .child(
-                            Flow.row()
-                                .fullWidth()
-                                .height(20)
-                                .childPadding(4)
-                                .child(
-                                    Widgets.text(IKey.dynamic(() -> "§7×" + exitQuantity(held.id)))
-                                        .expanded())
-                                .child(exitButton(held.id, false))
-                                .child(exitButton(held.id, true))));
+                chain.child(holdingRow(held));
             }
+        }
+
+        /** One holding card: the rich label plus the partial close / exercise buttons. */
+        private IWidget holdingRow(OptionMarket.Holding held) {
+            return Flow.column()
+                .fullWidth()
+                .height(43)
+                .childPadding(3)
+                .child(
+                    Widgets.text(IKey.dynamic(() -> optionHoldingLabel(held.id)))
+                        .color(0xFFDAE5F5)
+                        .fullWidth())
+                .child(
+                    Flow.row()
+                        .fullWidth()
+                        .height(20)
+                        .childPadding(4)
+                        .child(
+                            Widgets.text(IKey.str(""))
+                                .expanded())
+                        .child(exitButton(held.id, false))
+                        .child(exitButton(held.id, true)));
+        }
+
+        /** Cross-underlying, cross-expiry table of every open option holding. */
+        private void summaryPage(Flow container, boolean inline) {
+            if (account == null || account.options == null) {
+                container.child(
+                    Widgets.text(IKey.lang("gui.nhkantan.exchange.loading"))
+                        .color(0xFF7F93AD)
+                        .fullWidth());
+                return;
+            }
+            java.util.List<OptionMarket.Holding> holdings = new ArrayList<>();
+            for (OptionMarket.Holding held : account.options) if (held.remainingQuantity() > 0) holdings.add(held);
+            holdings.sort((left, right) -> {
+                int byGroup = summaryKey(left).compareTo(summaryKey(right));
+                return byGroup != 0 ? byGroup : Long.compare(left.id, right.id);
+            });
+            container.child(
+                Widgets.text(IKey.dynamic(this::summaryTotals))
+                    .color(0xFFCEE3FA)
+                    .fullWidth());
+            if (holdings.isEmpty()) {
+                container.child(
+                    Widgets.text(IKey.lang("gui.nhkantan.exchange.summary_empty"))
+                        .color(0xFF7F93AD)
+                        .fullWidth());
+                return;
+            }
+            container.child(summaryControls());
+            ListWidget<IWidget, ?> list = new ListWidget<>().fullWidth()
+                .expanded()
+                .padding(2)
+                .background(new Rectangle().color(0xFF121F32));
+            list.child(summaryHeader(inline));
+            for (int i = 0; i < holdings.size(); i++) list.child(summaryRow(holdings.get(i), (i & 1) == 1, inline));
+            container.child(list);
+        }
+
+        /** Wide windows keep the author's inline action buttons; narrow ones stack them below the data row. */
+        private boolean summaryInline(Flow container) {
+            int width = container.getArea()
+                .w();
+            if (width <= 0 && container.getScreen() != null) width = Math.round(
+                container.getScreen()
+                    .getScreenArea()
+                    .w() * 0.95F)
+                - 14;
+            return width >= SUMMARY_INLINE_WIDTH;
+        }
+
+        /** Sort key: underlying, then expiry (zero-padded so lexicographic order matches numeric order). */
+        private String summaryKey(OptionMarket.Holding held) {
+            OptionMarket.Contract contract = account.holdingContracts == null ? null
+                : account.holdingContracts.get(held.contract);
+            return contract == null ? held.contract
+                : contract.underlying + ":" + String.format(java.util.Locale.ROOT, "%012d", contract.expiryTick);
+        }
+
+        /** Quantity control for partial close / exercise; "全部" raises the shared quantity to the largest holding. */
+        private IWidget summaryControls() {
+            return Flow.row()
+                .fullWidth()
+                .height(18)
+                .childPadding(4)
+                .child(
+                    Widgets.text(IKey.lang("gui.nhkantan.exchange.summary_quantity"))
+                        .color(0xFFBDCCE0)
+                        .expanded())
+                .child(
+                    Widgets
+                        .stepButton(
+                            "-",
+                            quantityValue,
+                            -1,
+                            -10,
+                            1,
+                            1000000,
+                            IKey.lang("gui.nhkantan.exchange.step_hint"))
+                        .size(20, 18))
+                .child(number("quantity", quantityValue).width(80))
+                .child(
+                    Widgets
+                        .stepButton("+", quantityValue, 1, 10, 1, 1000000, IKey.lang("gui.nhkantan.exchange.step_hint"))
+                        .size(20, 18))
+                .child(button("summary_all", () -> quantity = maxOpenQuantity()));
+        }
+
+        private int maxOpenQuantity() {
+            long max = 1;
+            if (account != null && account.options != null)
+                for (OptionMarket.Holding held : account.options) max = Math.max(max, held.remainingQuantity());
+            return (int) Math.min(Integer.MAX_VALUE, max);
+        }
+
+        private IWidget summaryHeader(boolean inline) {
+            int expiry = inline ? 56 : 50;
+            int units = inline ? 40 : 38;
+            int kind = inline ? 36 : 32;
+            int strike = inline ? 56 : 52;
+            int avg = inline ? 48 : 44;
+            int rate = inline ? 56 : 52;
+            int pnl = inline ? 72 : 66;
+            Flow row = Flow.row()
+                .fullWidth()
+                .height(14)
+                .childPadding(2)
+                .background(new Rectangle().color(0xFF1D3048))
+                .child(summaryHeaderCell("summary_name", 0))
+                .child(summaryHeaderCell("summary_expiry", expiry))
+                .child(summaryHeaderCell("summary_units", units))
+                .child(summaryHeaderCell("summary_kind", kind))
+                .child(summaryHeaderCell("summary_strike", strike))
+                .child(summaryHeaderCell("summary_avg", avg))
+                .child(summaryHeaderCell("summary_rate", rate))
+                .child(summaryHeaderCell("summary_pnl_column", pnl));
+            if (inline) row.child(summaryHeaderCell("summary_actions", 208));
+            return row;
+        }
+
+        private IWidget summaryHeaderCell(String key, int width) {
+            TextWidget<?> text = Widgets.text(IKey.lang("gui.nhkantan.exchange." + key))
+                .color(0xFF9BB7D4);
+            return width <= 0 ? text.expanded() : text.width(width);
+        }
+
+        private TextWidget<?> summaryCell(java.util.function.Supplier<String> supplier, int width) {
+            TextWidget<?> text = Widgets.text(IKey.dynamic(supplier));
+            return width <= 0 ? text.expanded() : text.width(width);
+        }
+
+        private IWidget summaryRow(OptionMarket.Holding held, boolean alternate, boolean inline) {
+            OptionMarket.Contract contract = account.holdingContracts == null ? null
+                : account.holdingContracts.get(held.contract);
+            long id = held.id;
+            String name = contract == null ? held.contract : instrumentName(contract.underlying);
+            int expiry = inline ? 56 : 50;
+            int units = inline ? 40 : 38;
+            int kind = inline ? 36 : 32;
+            int strike = inline ? 56 : 52;
+            int avg = inline ? 48 : 44;
+            int rate = inline ? 56 : 52;
+            int pnl = inline ? 72 : 66;
+            Flow data = Flow.row()
+                .fullWidth()
+                .height(20)
+                .childPadding(2)
+                .child(summaryCell(() -> "§b" + name, 0))
+                .child(summaryCell(() -> expiryText(contract), expiry))
+                .child(summaryCell(() -> String.valueOf(optionQuantity(id)), units))
+                .child(summaryCell(() -> optionKind(contract), kind))
+                .child(summaryCell(() -> optionStrike(contract), strike))
+                .child(summaryCell(() -> {
+                    OptionMarket.Holding current = optionHolding(id);
+                    return current == null ? "§7-" : "§7" + optionEntry(current);
+                }, avg))
+                .child(summaryCell(() -> optionRateText(id), rate))
+                .child(summaryCell(() -> optionPnlText(id), pnl));
+            if (inline) {
+                data.background(new Rectangle().color(alternate ? 0xFF16263C : 0xFF121F32))
+                    .child(tableExitButton(id, false))
+                    .child(tableExitButton(id, true));
+                return data;
+            }
+            return Flow.column()
+                .fullWidth()
+                .height(40)
+                .background(new Rectangle().color(alternate ? 0xFF16263C : 0xFF121F32))
+                .child(data)
+                .child(
+                    Flow.row()
+                        .fullWidth()
+                        .height(20)
+                        .childPadding(2)
+                        .child(
+                            Widgets.text(IKey.str(""))
+                                .expanded())
+                        .child(tableExitButton(id, false))
+                        .child(tableExitButton(id, true)));
+        }
+
+        private String expiryText(OptionMarket.Contract contract) {
+            ClientExchangeData.Frame frame = ClientExchangeData.get();
+            long remaining = contract == null ? 0 : contract.expiryTick - (frame == null ? 0 : frame.gameTick);
+            return "§7" + String.format(java.util.Locale.ROOT, "%.2f", Math.max(0, remaining) / 24000D)
+                + StatCollector.translateToLocal("gui.nhkantan.exchange.summary_day_unit");
+        }
+
+        private long optionQuantity(long id) {
+            OptionMarket.Holding held = optionHolding(id);
+            return held == null ? 0 : held.remainingQuantity();
+        }
+
+        private String optionKind(OptionMarket.Contract contract) {
+            if (contract == null) return "";
+            boolean call = contract.kind == OptionPricing.Kind.CALL;
+            return "§" + (call ? "a" : "d")
+                + StatCollector.translateToLocal("gui.nhkantan.exchange.holding_" + (call ? "call" : "put"));
+        }
+
+        private String optionStrike(OptionMarket.Contract contract) {
+            return contract == null ? "" : "§e" + String.format(java.util.Locale.ROOT, "%.2f", contract.strike);
+        }
+
+        private long optionPnl(long id) {
+            OptionMarket.Holding held = optionHolding(id);
+            if (held == null) return 0;
+            long cost = held.remainingCostCents();
+            OptionMarket.Quote quote = holdingQuote(held);
+            return quote == null ? 0
+                : Math.subtractExact(Math.multiplyExact(quote.bidUnitCents, held.remainingQuantity()), cost);
+        }
+
+        private String optionPnlText(long id) {
+            OptionMarket.Holding held = optionHolding(id);
+            if (held == null || holdingQuote(held) == null) return "§7—";
+            long pnl = optionPnl(id);
+            return (pnl < 0 ? "§c" : "§a") + String.format(java.util.Locale.ROOT, "%+.2f", pnl / 100.0);
+        }
+
+        private String optionRateText(long id) {
+            OptionMarket.Holding held = optionHolding(id);
+            if (held == null || holdingQuote(held) == null) return "§7—";
+            long pnl = optionPnl(id);
+            return (pnl < 0 ? "§c" : "§a") + optionRate(held);
+        }
+
+        private static String optionAmount(long cents) {
+            return String.format(java.util.Locale.ROOT, "%.2f", cents / 100.0);
+        }
+
+        private ButtonWidget<?> tableExitButton(long holding, boolean exercise) {
+            return new ButtonWidget<>().width(104)
+                .height(18)
+                .background(new Rectangle().color(exercise ? 0xFF504265 : 0xFF215665))
+                .hoverBackground(new Rectangle().color(exercise ? 0xFF77618E : 0xFF337A87))
+                .overlay(
+                    IKey.dynamic(
+                        () -> "§f"
+                            + StatCollector.translateToLocalFormatted(
+                                "gui.nhkantan.exchange." + (exercise ? "exercise_option" : "close_option"))
+                            + " §7×"
+                            + exitQuantity(holding)
+                            + "§f ≈"
+                            + optionAmount(exitPayout(holding, exercise))))
+                .onMousePressed(GuiActions.leftClick(() -> exitOption(holding, exercise)));
+        }
+
+        private String summaryTotals() {
+            if (account == null || account.options == null) return "";
+            long cost = 0;
+            long value = 0;
+            boolean unpriced = false;
+            for (OptionMarket.Holding held : account.options) {
+                long quantity = held.remainingQuantity();
+                if (quantity <= 0) continue;
+                cost += held.remainingCostCents();
+                OptionMarket.Quote quote = holdingQuote(held);
+                if (quote == null) unpriced = true;
+                else value += quote.bidUnitCents * quantity;
+            }
+            long pnl = value - cost;
+            String rate = cost <= 0 ? "-" : String.format(java.util.Locale.ROOT, "%+.1f%%", pnl * 100.0 / cost);
+            String valueText = unpriced ? "§7—" : "§f" + CurrencyFormat.amount(value);
+            String pnlText = unpriced ? "§7—"
+                : (pnl < 0 ? "§c" : "§a") + CurrencyFormat.signedAmount(pnl) + " (" + rate + ")";
+            return "§7" + StatCollector.translateToLocal("gui.nhkantan.exchange.summary_cost")
+                + " §f"
+                + CurrencyFormat.amount(cost)
+                + " §7· "
+                + StatCollector.translateToLocal("gui.nhkantan.exchange.summary_value")
+                + " "
+                + valueText
+                + " §7· "
+                + StatCollector.translateToLocal("gui.nhkantan.exchange.summary_pnl")
+                + " "
+                + pnlText;
+        }
+
+        private OptionMarket.Quote holdingQuote(OptionMarket.Holding held) {
+            return account == null || account.holdingQuotes == null ? null : account.holdingQuotes.get(held.contract);
         }
 
         private OptionMarket.Holding optionHolding(long id) {
@@ -1039,8 +1339,7 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
             if (held == null || held.remainingQuantity() == 0) return 0;
             long count = exitQuantity(id);
             if (!exercise) {
-                OptionMarket.Quote quote = account.holdingQuotes == null ? null
-                    : account.holdingQuotes.get(held.contract);
+                OptionMarket.Quote quote = holdingQuote(held);
                 return quote == null ? 0 : Math.multiplyExact(quote.bidUnitCents, count);
             }
             OptionMarket.Contract contract = account.holdingContracts == null ? null
@@ -1058,26 +1357,61 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
             if (held == null) return "";
             OptionMarket.Contract contract = account.holdingContracts == null ? null
                 : account.holdingContracts.get(held.contract);
-            OptionMarket.Quote quote = account.holdingQuotes == null ? null : account.holdingQuotes.get(held.contract);
-            long pnl = quote == null ? 0
-                : Math.subtractExact(
-                    Math.multiplyExact(quote.bidUnitCents, held.remainingQuantity()),
-                    held.remainingCostCents());
-            String detail = contract == null ? held.contract
-                : instrumentName(contract.underlying) + " "
-                    + contract.kind
-                    + " K="
-                    + String.format(java.util.Locale.ROOT, "%.2f", contract.strike);
-            return detail + " ×"
-                + held.remainingQuantity()
-                + " "
-                + (pnl < 0 ? "§c" : "§a")
-                + CurrencyFormat.signedAmount(pnl)
-                + "§r";
+            OptionMarket.Quote quote = holdingQuote(held);
+            long quantity = held.remainingQuantity();
+            long cost = held.remainingCostCents();
+            boolean call = contract != null && contract.kind == OptionPricing.Kind.CALL;
+            String name = contract == null ? held.contract : instrumentName(contract.underlying);
+            String kind = contract == null ? ""
+                : "§" + (call ? "a" : "d")
+                    + StatCollector.translateToLocal("gui.nhkantan.exchange.holding_" + (call ? "call" : "put"));
+            String strike = contract == null ? ""
+                : " §eK=" + String.format(java.util.Locale.ROOT, "%.2f", contract.strike);
+            String units = StatCollector.translateToLocalFormatted("gui.nhkantan.exchange.holding_units", quantity);
+            String average = StatCollector
+                .translateToLocalFormatted("gui.nhkantan.exchange.holding_avg", optionEntry(held));
+            String performance = "§7—";
+            if (quote != null) {
+                long pnl = Math.subtractExact(Math.multiplyExact(quote.bidUnitCents, quantity), cost);
+                String color = pnl < 0 ? "§c" : "§a";
+                performance = color + "§l"
+                    + optionRate(held)
+                    + "§r §7(§r"
+                    + color
+                    + CurrencyFormat.signedAmount(pnl)
+                    + "§7)§r";
+            }
+            return "§b" + name
+                + "§r "
+                + "§7"
+                + units
+                + "§r "
+                + kind
+                + strike
+                + " §7"
+                + average
+                + "§r §7·§r "
+                + performance;
+        }
+
+        /** Average purchase price of the remaining contracts in NHC, e.g. {@code 1.97}. */
+        private String optionEntry(OptionMarket.Holding held) {
+            long quantity = held.remainingQuantity();
+            return quantity <= 0 ? "-"
+                : String.format(java.util.Locale.ROOT, "%.2f", held.remainingCostCents() / (double) quantity / 100.0);
+        }
+
+        /** Return on the remaining contracts valued at the current buyback bid, e.g. {@code -90.9%}. */
+        private String optionRate(OptionMarket.Holding held) {
+            long cost = held.remainingCostCents();
+            OptionMarket.Quote quote = holdingQuote(held);
+            if (cost <= 0 || quote == null) return "-";
+            long pnl = Math.subtractExact(Math.multiplyExact(quote.bidUnitCents, held.remainingQuantity()), cost);
+            return String.format(java.util.Locale.ROOT, "%+.1f%%", pnl * 100.0 / cost);
         }
 
         private ButtonWidget<?> exitButton(long holding, boolean exercise) {
-            return new ButtonWidget<>().width(112)
+            return new ButtonWidget<>().width(128)
                 .height(20)
                 .background(new Rectangle().color(exercise ? 0xFF504265 : 0xFF215665))
                 .hoverBackground(new Rectangle().color(exercise ? 0xFF77618E : 0xFF337A87))
@@ -1086,10 +1420,10 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
                         () -> "§f"
                             + StatCollector.translateToLocalFormatted(
                                 "gui.nhkantan.exchange." + (exercise ? "exercise_option" : "close_option"))
-                            + " ≈"
+                            + " §7×"
+                            + exitQuantity(holding)
+                            + "§f ≈"
                             + CurrencyFormat.amount(exitPayout(holding, exercise))))
-                .addTooltipLine(
-                    IKey.lang("gui.nhkantan.exchange." + (exercise ? "exercise_hint" : "close_option_hint")))
                 .onMousePressed(GuiActions.leftClick(() -> exitOption(holding, exercise)));
         }
 
@@ -1097,7 +1431,7 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
             OptionMarket.Holding held = optionHolding(id);
             if (held == null || held.remainingQuantity() == 0) return;
             long minimum = exitPayout(id, exercise);
-            OptionMarket.Quote quote = account.holdingQuotes == null ? null : account.holdingQuotes.get(held.contract);
+            OptionMarket.Quote quote = holdingQuote(held);
             if ((exercise && minimum <= 0) || (!exercise && quote == null)) {
                 localError = "invalid";
                 return;
@@ -1105,6 +1439,7 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
             localError = "";
             long count = exitQuantity(id);
             long request = sequence++;
+            long floor = minimum > 0 ? minimum * (10000 - EXIT_SLIPPAGE_BPS) / 10000 : minimum;
             sync.callSyncedAction("exchange_option_exit", packet -> {
                 ByteBufUtils.writeUTF8String(packet, generation);
                 packet.writeLong(request);
@@ -1112,7 +1447,7 @@ public final class ExchangeGui implements IGuiHolder<GuiData> {
                 packet.writeLong(count);
                 packet.writeBoolean(exercise);
                 packet.writeLong(quote == null ? 0 : quote.id);
-                packet.writeLong(minimum);
+                packet.writeLong(floor);
             });
         }
 
