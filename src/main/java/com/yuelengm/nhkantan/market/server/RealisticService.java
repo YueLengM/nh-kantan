@@ -353,15 +353,15 @@ public final class RealisticService {
         frame.commissionPpm = RealisticConfig.commissionPpm;
         frame.names = names;
         frame.instruments = instruments;
-        if (gameTick % 200 < 5) {
-            long volume = 0;
-            for (SimulatedInstrument.Snapshot instrument : instruments.values()) volume += instrument.volume;
-            NHKantan.LOG.info(
-                "Realistic exchange snapshot: tick={}, instruments={}, cumulative matched volume={}",
-                gameTick,
-                instruments.size(),
-                volume);
-        }
+        // if (gameTick % 200 < 5) {
+        // long volume = 0;
+        // for (SimulatedInstrument.Snapshot instrument : instruments.values()) volume += instrument.volume;
+        // NHKantan.LOG.info(
+        // "Realistic exchange snapshot: tick={}, instruments={}, cumulative matched volume={}",
+        // gameTick,
+        // instruments.size(),
+        // volume);
+        // }
         return frame;
     }
 
