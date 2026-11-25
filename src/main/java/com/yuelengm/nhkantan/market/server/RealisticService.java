@@ -370,6 +370,11 @@ public final class RealisticService {
         return com.yuelengm.nhkantan.market.view.OptionChainView.filter(privateView(player), underlying, day, gameTick);
     }
 
+    /** All open option holdings for the terminal summary page; the tradable chain is omitted. */
+    public String optionSummary(EntityPlayerMP player) {
+        return com.yuelengm.nhkantan.market.view.OptionChainView.filterSummary(privateView(player));
+    }
+
     public long balance(EntityPlayerMP player) {
         com.google.gson.JsonObject cached = new com.google.gson.JsonParser().parse(privateView(player))
             .getAsJsonObject();

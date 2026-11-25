@@ -82,4 +82,47 @@ public final class OptionChainView {
         view.remove("notifications"); // Notifications use their own bounded, acknowledged channel.
         return view.toString();
     }
+
+    /**
+     * Summary-page view: keeps every open holding (all underlyings and expiries) and the contracts/quotes they need,
+     * but drops the tradable chain, private order state and fields the summary page never reads, so the payload stays
+     * well below the GUI string budget.
+     */
+    public static String filterSummary(String snapshot) {
+        com.google.gson.JsonObject view = new com.google.gson.JsonParser().parse(snapshot)
+            .getAsJsonObject();
+        view.remove("contracts");
+        view.remove("quotes");
+        view.remove("notifications");
+        view.remove("orders");
+        view.remove("protections");
+        view.remove("closing");
+        trimHoldings(view);
+        trimObjects(view, "holdingQuotes", "contract", "validUntilMillis", "unitCents", "theoretical", "delta");
+        trimObjects(view, "holdingContracts", "id");
+        return view.toString();
+    }
+
+    private static void trimHoldings(com.google.gson.JsonObject view) {
+        if (!view.has("options") || !view.get("options")
+            .isJsonArray()) return;
+        for (com.google.gson.JsonElement element : view.getAsJsonArray("options")) if (element.isJsonObject()) {
+            com.google.gson.JsonObject holding = element.getAsJsonObject();
+            holding.remove("owner");
+            holding.remove("payoutCents");
+        }
+    }
+
+    private static void trimObjects(com.google.gson.JsonObject view, String name, String... fields) {
+        if (!view.has(name) || !view.get(name)
+            .isJsonObject()) return;
+        for (java.util.Map.Entry<String, com.google.gson.JsonElement> entry : view.getAsJsonObject(name)
+            .entrySet()) {
+            if (!entry.getValue()
+                .isJsonObject()) continue;
+            com.google.gson.JsonObject value = entry.getValue()
+                .getAsJsonObject();
+            for (String field : fields) value.remove(field);
+        }
+    }
 }
